@@ -10,35 +10,64 @@ import {
 } from "react-native";
 
 export default function AmountScreen({ route, navigation }) {
-  const { mobile } = route.params;
+  const { scannedData, mobile: mobileParam } = route.params || {};
   const [amount, setAmount] = useState("");
   const [note, setNote] = useState("");
   const sliderAnim = useRef(new Animated.Value(300)).current;
 
-  const handleNext = () => {
-    if (!amount) return alert("Enter amount");
-    navigation.navigate("Auth", { mobile, amount, note });
+  
+  const mobileOrUpi = scannedData?.upiId || mobileParam || "Unknown";
+
+  const handleTransaction = () => {
+    if (!amount) {
+      return alert("Please Enter amount");
+    }
+   
+    navigation.navigate("Auth", {
+      mobile: mobileOrUpi,
+      amount,
+      note,
+    });
   };
 
   useEffect(() => {
-    // Animate slider input on mount
-    Animated.spring(sliderAnim, { toValue: 0, friction: 6, tension: 40, useNativeDriver: true }).start();
+    Animated.spring(sliderAnim, {
+      toValue: 0,
+      friction: 6,
+      tension: 40,
+      useNativeDriver: true,
+    }).start();
   }, []);
 
   return (
-    <KeyboardAvoidingView style={styles.container}>
+    <KeyboardAvoidingView style={styles.container} behavior="padding">
       <Animated.View style={{ transform: [{ translateY: sliderAnim }] }}>
-        <Text style={styles.label}>Paying to: {mobile}</Text>
+        {/* Recipient Card */}
+        <View style={styles.recipientCard}>
+          <View style={styles.avatar}>
+            <Text style={styles.avatarText}>
+              {(scannedData?.name || mobileParam || "U")[0].toUpperCase()}
+            </Text>
+          </View>
+          <View>
+            <Text style={styles.label}>Paying to</Text>
+            <Text style={styles.recipientText}>
+              {scannedData?.name || mobileParam || "Unknown"}
+            </Text>
+          </View>
+        </View>
 
+        {/* Amount input */}
         <TextInput
           style={styles.amountInput}
-          placeholder="Enter amount"
+          placeholder="₹0"
           keyboardType="numeric"
           value={amount}
           onChangeText={setAmount}
           placeholderTextColor="#A3A3A3"
         />
 
+        {/* Note input */}
         <TextInput
           style={styles.noteInput}
           placeholder="Add a note (optional)"
@@ -47,8 +76,9 @@ export default function AmountScreen({ route, navigation }) {
           placeholderTextColor="#A3A3A3"
         />
 
-        <TouchableOpacity style={styles.nextButton} onPress={handleNext}>
-          <Text style={styles.nextButtonText}>Next</Text>
+        {/* Button */}
+        <TouchableOpacity style={styles.nextButton} onPress={handleTransaction}>
+          <Text style={styles.nextButtonText}>Proceed to Pay</Text>
         </TouchableOpacity>
       </Animated.View>
     </KeyboardAvoidingView>
@@ -58,24 +88,56 @@ export default function AmountScreen({ route, navigation }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#D1FAE5", // soft green background
+    backgroundColor: "#F9FAFB",
     justifyContent: "center",
     padding: 20,
   },
+  recipientCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#FFFFFF",
+    padding: 20,
+    borderRadius: 16,
+    marginBottom: 24,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.05,
+    shadowRadius: 6,
+    elevation: 4,
+  },
+  avatar: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: "#059669",
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: 15,
+  },
+  avatarText: {
+    color: "#fff",
+    fontWeight: "700",
+    fontSize: 20,
+  },
   label: {
+    fontSize: 14,
+    fontWeight: "500",
+    color: "#6B7280",
+  },
+  recipientText: {
     fontSize: 18,
-    fontWeight: "600",
-    color: "#065F46",
-    marginBottom: 12,
+    fontWeight: "800",
+    color: "#047857",
   },
   amountInput: {
     backgroundColor: "#FFFFFF",
     padding: 18,
     borderRadius: 16,
-    fontSize: 28,
+    fontSize: 32,
     fontWeight: "700",
     color: "#065F46",
     marginBottom: 16,
+    textAlign: "center",
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.05,
@@ -92,11 +154,11 @@ const styles = StyleSheet.create({
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.03,
-    shadowRadius: 3,
     elevation: 2,
+    shadowRadius: 3,
   },
   nextButton: {
-    backgroundColor: "#059669", // modern green
+    backgroundColor: "#059669",
     paddingVertical: 16,
     borderRadius: 16,
     alignItems: "center",

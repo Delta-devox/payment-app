@@ -6,6 +6,7 @@ import AmountScreen from "../screens/AmountScreen";
 import AuthScreen from "../screens/AuthScreen";
 import SuccessScreen from "../screens/SuccessScreen";
 import HistoryScreen from "../screens/HistoryScreen";
+import QrScannerScreen from "../screens/QrScreen";
 
 const Stack = createNativeStackNavigator();
 
@@ -18,6 +19,7 @@ export default function AppNavigator() {
       <Stack.Screen name="Auth" component={AuthScreen} />
       <Stack.Screen name="Success" component={SuccessScreen} />
       <Stack.Screen name="History" component={HistoryScreen} />
+      <Stack.Screen name="QrScanner" component={QrScannerScreen} />
     </Stack.Navigator>
   );
 }

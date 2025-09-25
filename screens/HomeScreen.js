@@ -9,7 +9,6 @@ import {
   StyleSheet,
   Animated,
   Dimensions,
-  SafeAreaView,
   StatusBar,
   Platform,
   Alert,
@@ -17,6 +16,7 @@ import {
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import BottomNav from "../components/BottomNav";
 import TransactionCard from "../components/TransactionCard";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 const { width } = Dimensions.get("window");
 
@@ -134,6 +134,13 @@ export default function HomeScreen({ navigation }) {
               <Pressable
                 style={styles.actionButton}
                 android_ripple={{ color: "#A7F3D0", borderless: true }}
+                onPress={() => {
+                  if (a.name === "Scan QR") {
+                    navigation.navigate("QrScanner");
+                  } else {
+                    Alert.alert(a.name, "Feature coming soon!");
+                  }
+                }}
               >
                 <MaterialCommunityIcons name={a.icon} size={28} color="#16A34A" />
                 <Text style={styles.actionText}>{a.name}</Text>

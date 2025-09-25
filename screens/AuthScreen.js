@@ -1,23 +1,49 @@
 import React, { useEffect, useState, useRef } from "react";
-import { View, Text, TextInput, TouchableOpacity, Animated, StyleSheet } from "react-native";
+import {
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  Animated,
+  StyleSheet,
+} from "react-native";
 import * as LocalAuthentication from "expo-local-authentication";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 
-// Function to mask mobile number
+// --- Helpers ---
 function maskMobile(number) {
-  if (!number || number.length < 4) return number;
+  if (!number || typeof number !== "string") return "Unknown";
+  if (number.length < 4) return number;
   const last4 = number.slice(-4);
   return `+91 XXXXX${last4}`;
 }
 
+function maskUPI(upi) {
+  if (!upi || typeof upi !== "string") return "Unknown";
+  const parts = upi.split("@");
+  if (parts.length !== 2) return upi;
+  const name = parts[0];
+  const masked = name.slice(0, 2) + "***";
+  return masked + "@" + parts[1];
+}
+
+// --- Component ---
 export default function AuthScreen({ route, navigation }) {
-  const { mobile, amount, note } = route.params;
+  const { mobile: mobileParam, amount, note } = route.params || {};
+
+  // Determine if it's a mobile number or UPI ID
+  const mobile =
+    typeof mobileParam === "string"
+      ? mobileParam
+      : mobileParam?.upiId || mobileParam?.mobile || "Unknown";
+
   const [showPin, setShowPin] = useState(false);
   const [pin, setPin] = useState("");
 
   const slideAnim = useRef(new Animated.Value(100)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
 
+  // --- Biometric Authentication ---
   useEffect(() => {
     (async () => {
       const hasHardware = await LocalAuthentication.hasHardwareAsync();
@@ -35,11 +61,21 @@ export default function AuthScreen({ route, navigation }) {
     })();
   }, []);
 
+  // --- Animate PIN / fingerprint view ---
   useEffect(() => {
     if (showPin) {
       Animated.parallel([
-        Animated.spring(slideAnim, { toValue: 0, friction: 6, tension: 40, useNativeDriver: true }),
-        Animated.timing(fadeAnim, { toValue: 1, duration: 400, useNativeDriver: true }),
+        Animated.spring(slideAnim, {
+          toValue: 0,
+          friction: 6,
+          tension: 40,
+          useNativeDriver: true,
+        }),
+        Animated.timing(fadeAnim, {
+          toValue: 1,
+          duration: 400,
+          useNativeDriver: true,
+        }),
       ]).start();
     }
   }, [showPin]);
@@ -52,36 +88,61 @@ export default function AuthScreen({ route, navigation }) {
   return (
     <View style={styles.container}>
       {/* Back button */}
-      <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
+      <TouchableOpacity
+        style={styles.backButton}
+        onPress={() => navigation.goBack()}
+      >
         <MaterialCommunityIcons name="arrow-left" size={28} color="#065F46" />
       </TouchableOpacity>
 
-      {/* Mobile number */}
-      <Text style={styles.mobileText}>Paying to: {maskMobile(mobile)}</Text>
+      {/* Amount */}
+      <Text style={styles.amountText}>₹{amount}</Text>
+
+      {/* Recipient */}
+      <Text style={styles.mobileText}>
+        Paying to: {mobile.includes("@") ? maskUPI(mobile) : maskMobile(mobile)}
+      </Text>
+
+      {/* Note */}
+      {note ? <Text style={styles.noteText}>Note: {note}</Text> : null}
 
       {showPin ? (
-        <Animated.View style={{ opacity: fadeAnim, transform: [{ translateY: slideAnim }] }}>
-          <Text style={styles.label}>Enter your PIN</Text>
+        <Animated.View
+          style={{ opacity: fadeAnim, transform: [{ translateY: slideAnim }] }}
+        >
+          <Text style={styles.label}>Enter your UPI PIN</Text>
           <TextInput
             placeholder="●●●●"
             maxLength={4}
-            secureTextEntry={true} 
+            secureTextEntry={true}
             keyboardType="number-pad"
             style={styles.pinInput}
             value={pin}
             onChangeText={setPin}
             placeholderTextColor="#A3A3A3"
           />
-          <TouchableOpacity style={styles.confirmButton} onPress={handlePinSubmit}>
+          <TouchableOpacity
+            style={styles.confirmButton}
+            onPress={handlePinSubmit}
+          >
             <Text style={styles.confirmText}>Confirm Payment</Text>
           </TouchableOpacity>
         </Animated.View>
       ) : (
-        <Animated.View style={{ opacity: fadeAnim, transform: [{ translateY: slideAnim }] }}>
-          <MaterialCommunityIcons name="fingerprint" size={100} color="#059669" />
+        <Animated.View
+          style={{ opacity: fadeAnim, transform: [{ translateY: slideAnim }] }}
+        >
+          <MaterialCommunityIcons
+            name="fingerprint"
+            size={100}
+            color="#059669"
+          />
           <Text style={styles.fingerprintText}>Touch fingerprint sensor</Text>
-          <TouchableOpacity style={styles.usePinButton} onPress={() => setShowPin(true)}>
-            <Text style={styles.usePinText}>Use PIN</Text>
+          <TouchableOpacity
+            style={styles.usePinButton}
+            onPress={() => setShowPin(true)}
+          >
+            <Text style={styles.usePinText}>Use PIN instead</Text>
           </TouchableOpacity>
         </Animated.View>
       )}
@@ -89,10 +150,11 @@ export default function AuthScreen({ route, navigation }) {
   );
 }
 
+// --- Styles ---
 const styles = {
   container: {
     flex: 1,
-    backgroundColor: "#D1FAE5",
+    backgroundColor: "#ECFDF5",
     justifyContent: "center",
     alignItems: "center",
     padding: 20,
@@ -103,10 +165,22 @@ const styles = {
     left: 20,
     zIndex: 10,
   },
+  amountText: {
+    fontSize: 42,
+    fontWeight: "700",
+    color: "#065F46",
+    marginBottom: 8,
+  },
   mobileText: {
     fontSize: 18,
     fontWeight: "600",
     color: "#065F46",
+    marginBottom: 6,
+  },
+  noteText: {
+    fontSize: 16,
+    fontStyle: "italic",
+    color: "#6B7280",
     marginBottom: 20,
   },
   label: {
