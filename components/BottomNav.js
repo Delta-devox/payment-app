@@ -1,8 +1,8 @@
-import React from "react";
-import { View, TouchableOpacity, Text, StyleSheet } from "react-native";
+import React, { useRef } from "react";
+import { View, Text, StyleSheet, Pressable, Animated } from "react-native";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 
-export default function BottomNav({ active, navigation }) {
+export default function BottomNav({ active, navigation, openSidebar }) {
   const tabs = [
     { name: "Home", icon: "home" },
     { name: "History", icon: "history" },
@@ -12,22 +12,52 @@ export default function BottomNav({ active, navigation }) {
 
   return (
     <View style={styles.container}>
-      {tabs.map((tab, i) => (
-        <TouchableOpacity
-          key={i}
-          style={styles.tabButton}
-          onPress={() => navigation.navigate(tab.name)}
-        >
-          <MaterialCommunityIcons
-            name={tab.icon}
-            size={28}
-            color={active === tab.name ? "#0F766E" : "#6B7280"} // teal for active
-          />
-          <Text style={[styles.tabText, active === tab.name && styles.activeText]}>
-            {tab.name}
-          </Text>
-        </TouchableOpacity>
-      ))}
+      {tabs.map((tab, i) => {
+        const isActive = active === tab.name;
+        const scale = useRef(new Animated.Value(isActive ? 1.2 : 1)).current;
+
+        const handlePress = () => {
+          if (tab.name === "Profile" && openSidebar) {
+            openSidebar(); // open sidebar instead of navigating
+          } else {
+            navigation.navigate(tab.name);
+          }
+
+          Animated.spring(scale, {
+            toValue: 1.2,
+            friction: 3,
+            useNativeDriver: true,
+          }).start(() =>
+            Animated.spring(scale, {
+              toValue: 1,
+              friction: 3,
+              useNativeDriver: true,
+            }).start()
+          );
+        };
+
+        return (
+          <Pressable
+            key={i}
+            style={({ pressed }) => [
+              styles.tabButton,
+              pressed && { opacity: 0.7 },
+            ]}
+            onPress={handlePress}
+          >
+            <Animated.View style={{ transform: [{ scale }] }}>
+              <MaterialCommunityIcons
+                name={tab.icon}
+                size={28}
+                color={isActive ? "#0F766E" : "#9CA3AF"}
+              />
+            </Animated.View>
+            <Text style={[styles.tabText, isActive && styles.activeText]}>
+              {tab.name}
+            </Text>
+          </Pressable>
+        );
+      })}
     </View>
   );
 }
@@ -38,18 +68,20 @@ const styles = StyleSheet.create({
     justifyContent: "space-around",
     alignItems: "center",
     height: 70,
+    marginHorizontal: 16,
+    marginBottom: 12,
+    borderRadius: 20,
     backgroundColor: "#FFFFFF",
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: -3 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 5,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
+    elevation: 4,
   },
   tabButton: {
     alignItems: "center",
     justifyContent: "center",
+    flex: 1,
   },
   tabText: {
     fontSize: 12,

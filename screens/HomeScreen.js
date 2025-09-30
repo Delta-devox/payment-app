@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useContext } from "react";
 import {
   View,
   ScrollView,
@@ -14,17 +14,21 @@ import {
   Alert,
 } from "react-native";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
 import BottomNav from "../components/BottomNav";
 import TransactionCard from "../components/TransactionCard";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { TransactionContext } from "../context/TransactionContext";
+import EnhancedSidebar from "../components/Sidebar";
 
 const { width } = Dimensions.get("window");
 
 export default function HomeScreen({ navigation }) {
   const [mobile, setMobile] = useState("");
-
-  // Animation for quick actions
   const animValues = useRef([...Array(6)].map(() => new Animated.Value(0))).current;
+  const { transaction } = useContext(TransactionContext);
+  const recentTx = transaction.slice(0, 4);
+  const [sidebarOpen, setOpen] = useState(false);
 
   const actions = [
     { name: "Scan QR", icon: "qrcode-scan" },
@@ -36,19 +40,11 @@ export default function HomeScreen({ navigation }) {
   ];
 
   const offers = [
-    { id: 1, title: "10% Cashback on Recharge" },
-    { id: 2, title: "Flat ₹50 off on Bills" },
-    { id: 3, title: "Refer & Earn ₹100" },
+    { id: 1, title: "10% Cashback on Recharge", colors: ["#6EE7B7", "#3B82F6"] },
+    { id: 2, title: "Flat ₹50 off on Bills", colors: ["#FECACA", "#F87171"] },
+    { id: 3, title: "Refer & Earn ₹100", colors: ["#FDE68A", "#F59E0B"] },
   ];
 
-  const recentTx = [
-    { name: "Sarah M.", type: "paid", amount: "-₹150", status: "success" },
-    { name: "Jane D.", type: "received", amount: "+₹500", status: "success" },
-    { name: "Mohan S.", type: "paid", amount: "-₹200", status: "failed" },
-    { name: "Dennis E.", type: "received", amount: "+₹500", status: "success" },
-  ];
-
-  // Animate quick actions on mount
   useEffect(() => {
     animValues.forEach((anim, i) => {
       Animated.spring(anim, {
@@ -62,14 +58,8 @@ export default function HomeScreen({ navigation }) {
   }, []);
 
   const handlePay = () => {
-    if (!mobile) {
-      Alert.alert("Error", "Please enter mobile number");
-      return;
-    }
-    if (!/^\d{10}$/.test(mobile)) {
-      Alert.alert("Error", "Mobile number must be exactly 10 digits");
-      return;
-    }
+    if (!mobile) return Alert.alert("Error", "Please enter mobile number");
+    if (!/^\d{10}$/.test(mobile)) return Alert.alert("Error", "Mobile number must be exactly 10 digits");
     navigation.navigate("Amount", { mobile });
   };
 
@@ -78,22 +68,32 @@ export default function HomeScreen({ navigation }) {
       <StatusBar barStyle="dark-content" backgroundColor="#F0FDF4" />
 
       {/* Header */}
-      <View style={styles.header}>
+      <LinearGradient
+        colors={["#16A34A", "#22C55E"]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 0 }}
+        style={styles.header}
+      >
         <TouchableOpacity>
-          <MaterialCommunityIcons name="menu" size={28} color="#065F46" />
+          <MaterialCommunityIcons name="menu" size={28} color="#fff" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Payments</Text>
         <TouchableOpacity style={styles.iconButton}>
-          <MaterialCommunityIcons name="bell-outline" size={24} color="#4B5563" />
+          <MaterialCommunityIcons name="bell-outline" size={24} color="#fff" />
         </TouchableOpacity>
-      </View>
+      </LinearGradient>
 
       <ScrollView style={styles.scrollContainer} showsVerticalScrollIndicator={false}>
         {/* Greeting Card */}
-        <View style={styles.greetingCard}>
+        <LinearGradient
+          colors={["#22C55E", "#10B981"]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.greetingCard}
+        >
           <Text style={styles.greetingText}>Good Morning, AB 👋</Text>
           <Text style={styles.greetingBalance}>Balance: ₹5,430</Text>
-        </View>
+        </LinearGradient>
 
         {/* Pay Section */}
         <View style={styles.payCard}>
@@ -115,7 +115,7 @@ export default function HomeScreen({ navigation }) {
         </View>
 
         {/* Quick Actions */}
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.actionsScroll}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.actionsScroll} contentContainerStyle={{padding:10,marginBottom:5}}>
           {actions.map((a, i) => (
             <Animated.View
               key={i}
@@ -123,23 +123,20 @@ export default function HomeScreen({ navigation }) {
                 opacity: animValues[i],
                 transform: [
                   {
-                    translateY: animValues[i].interpolate({
-                      inputRange: [0, 1],
-                      outputRange: [20, 0],
-                    }),
+                    translateY: animValues[i].interpolate({ inputRange: [0, 1], outputRange: [20, 0] }),
                   },
                 ],
               }}
             >
               <Pressable
-                style={styles.actionButton}
+                style={({ pressed }) => [
+                  styles.actionButton,
+                  pressed && { transform: [{ scale: 0.95 }] },
+                ]}
                 android_ripple={{ color: "#A7F3D0", borderless: true }}
                 onPress={() => {
-                  if (a.name === "Scan QR") {
-                    navigation.navigate("QrScanner");
-                  } else {
-                    Alert.alert(a.name, "Feature coming soon!");
-                  }
+                  if (a.name === "Scan QR") navigation.navigate("QrScanner");
+                  else Alert.alert(a.name, "Feature coming soon!");
                 }}
               >
                 <MaterialCommunityIcons name={a.icon} size={28} color="#16A34A" />
@@ -151,11 +148,17 @@ export default function HomeScreen({ navigation }) {
 
         {/* Offers Section */}
         <Text style={styles.sectionTitle}>Offers & Rewards</Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 16 }}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 16, padding:10 }}>
           {offers.map((offer) => (
-            <View key={offer.id} style={styles.offerCard}>
+            <LinearGradient
+              key={offer.id}
+              colors={offer.colors}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.offerCard}
+            >
               <Text style={styles.offerText}>{offer.title}</Text>
-            </View>
+            </LinearGradient>
           ))}
         </ScrollView>
 
@@ -168,92 +171,108 @@ export default function HomeScreen({ navigation }) {
         </View>
       </ScrollView>
 
-      <BottomNav active="Home" navigation={navigation} />
+      <EnhancedSidebar isOpen={sidebarOpen} onClose={() => setOpen(false)} />
+      <BottomNav active="Home" navigation={navigation} openSidebar={() => setOpen(true)} />
     </SafeAreaView>
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#F0FDF4" },
+export const styles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: "#E6FFFA" },
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    paddingHorizontal: 16,
-    paddingBottom: 12,
-    paddingTop: Platform.OS === "android" ? StatusBar.currentHeight + 8 : 0,
+    paddingHorizontal: 20,
+    paddingBottom: 16,
+    paddingTop: Platform.OS === "android" ? StatusBar.currentHeight + 10 : 10,
+    borderBottomLeftRadius: 20,
+    borderBottomRightRadius: 20,
   },
-  headerTitle: { fontSize: 20, fontWeight: "bold", color: "#065F46" },
-  iconButton: { padding: 8, borderRadius: 12, backgroundColor: "#ECFDF5" },
-  scrollContainer: { paddingHorizontal: 16, paddingTop: 8 },
+  headerTitle: { fontSize: 22, fontWeight: "bold", color: "#fff" },
+  iconButton: { padding: 10, borderRadius: 12, backgroundColor: "#10B98180" },
+  scrollContainer: { paddingHorizontal: 16, paddingTop: 12 },
   greetingCard: {
-    backgroundColor: "#16A34A",
-    borderRadius: 20,
-    padding: 20,
-    marginBottom: 16,
+    borderRadius: 24,
+    padding: 24,
+    marginBottom: 20,
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.1,
-    shadowRadius: 5,
-    elevation: 4,
+    shadowOffset: { width: 0, height: 5 },
+    shadowOpacity: 0.12,
+    shadowRadius: 10,
+    elevation: 5,
   },
-  greetingText: { color: "#fff", fontSize: 18, fontWeight: "600" },
-  greetingBalance: { color: "#D1FAE5", fontSize: 16, fontWeight: "500", marginTop: 4 },
+  greetingText: { color: "#fff", fontSize: 20, fontWeight: "600" },
+  greetingBalance: { color: "#D1FAE5", fontSize: 18, fontWeight: "500", marginTop: 6 },
   payCard: {
     backgroundColor: "#ECFDF5",
-    borderRadius: 20,
-    padding: 20,
-    marginBottom: 16,
+    borderRadius: 24,
+    padding: 24,
+    marginBottom: 20,
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 3 },
+    shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.08,
-    shadowRadius: 5,
-    elevation: 3,
+    shadowRadius: 8,
+    elevation: 4,
   },
-  sectionTitle: { fontSize: 16, fontWeight: "600", color: "#047857", marginBottom: 12 },
+  sectionTitle: { fontSize: 16, fontWeight: "600", color: "#047857", marginBottom: 14 },
   payRow: { flexDirection: "row", alignItems: "center" },
   payInput: {
     flex: 1,
-    backgroundColor: "#fff",
-    padding: 12,
-    borderRadius: 12,
+    backgroundColor: "#FFFFFF",
+    padding: 14,
+    borderRadius: 16,
     fontSize: 16,
     color: "#065F46",
-    marginRight: 12,
+    marginRight: 14,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 3,
+    elevation: 2,
   },
   payButton: {
     backgroundColor: "#16A34A",
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    borderRadius: 12,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  payButtonText: { color: "#fff", fontWeight: "600", fontSize: 16 },
-  actionsScroll: { marginBottom: 16 },
-  actionButton: {
-    marginRight: 12,
-    padding: 14,
+    paddingVertical: 14,
+    paddingHorizontal: 24,
     borderRadius: 16,
-    backgroundColor: "#ECFDF5",
     justifyContent: "center",
     alignItems: "center",
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.1,
-    shadowRadius: 5,
+    shadowRadius: 6,
     elevation: 3,
   },
-  actionText: { marginTop: 6, fontSize: 12, color: "#047857" },
-  offerCard: {
-    width: width * 0.6,
-    backgroundColor: "#ECFDF5",
-    borderRadius: 16,
-    marginRight: 12,
-    padding: 12,
+  payButtonText: { color: "#fff", fontWeight: "600", fontSize: 16 },
+  actionsScroll: { marginBottom: 20 },
+  actionButton: {
+    marginRight: 14,
+    padding: 16,
+    borderRadius: 20,
+    backgroundColor: "#FFFFFF",
     justifyContent: "center",
     alignItems: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
+    elevation: 4,
   },
-  offerText: { fontSize: 14, fontWeight: "500", color: "#065F46", textAlign: "center" },
-  transactionSection: { marginBottom: 20 },
+  actionText: { marginTop: 8, fontSize: 12, color: "#047857", fontWeight: "500" },
+  offerCard: {
+    width: width * 0.62,
+    borderRadius: 20,
+    marginRight: 14,
+    padding: 16,
+    justifyContent: "center",
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
+    elevation: 4,
+  },
+  offerText: { fontSize: 14, fontWeight: "500", color: "#fff", textAlign: "center" },
+  transactionSection: { marginTop:10,marginBottom: 24 },
 });

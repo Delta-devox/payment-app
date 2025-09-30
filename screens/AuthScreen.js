@@ -1,243 +1,290 @@
-import React, { useEffect, useState, useRef } from "react";
-import {
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  Animated,
-  StyleSheet,
-} from "react-native";
-import * as LocalAuthentication from "expo-local-authentication";
-import { MaterialCommunityIcons } from "@expo/vector-icons";
+  import React, { useEffect, useState, useRef, useCallback } from "react";
+  import {
+    View,
+    Text,
+    TextInput,
+    Pressable,
+    Animated,
+    StyleSheet,
+    SafeAreaView,
+    Platform,
+    StatusBar,
+    Dimensions,
+  } from "react-native";
+  import * as LocalAuthentication from "expo-local-authentication";
+  import { MaterialCommunityIcons } from "@expo/vector-icons";
+  import { LinearGradient } from "expo-linear-gradient";
 
-// --- Helpers ---
-function maskMobile(number) {
-  if (!number || typeof number !== "string") return "Unknown";
-  if (number.length < 4) return number;
-  const last4 = number.slice(-4);
-  return `+91 XXXXX${last4}`;
-}
+  const { width } = Dimensions.get("window");
 
-function maskUPI(upi) {
-  if (!upi || typeof upi !== "string") return "Unknown";
-  const parts = upi.split("@");
-  if (parts.length !== 2) return upi;
-  const name = parts[0];
-  const masked = name.slice(0, 2) + "***";
-  return masked + "@" + parts[1];
-}
+  export default function AuthScreen({ route, navigation }) {
+    const { name, mobile, amount, note } = route.params || {};
+    const [showPin, setShowPin] = useState(false);
+    const [pin, setPin] = useState("");
+    const [focusedIndex, setFocusedIndex] = useState(null);
 
-// --- Component ---
-export default function AuthScreen({ route, navigation }) {
-  const { mobile: mobileParam, amount, note } = route.params || {};
+    // Animation refs
+    const slideAnim = useRef(new Animated.Value(100)).current;
+    const fadeAnim = useRef(new Animated.Value(0)).current;
+    const cardAnim = useRef(new Animated.Value(-150)).current;
+    const pulseAnim = useRef(new Animated.Value(1)).current;
 
-  // Determine if it's a mobile number or UPI ID
-  const mobile =
-    typeof mobileParam === "string"
-      ? mobileParam
-      : mobileParam?.upiId || mobileParam?.mobile || "Unknown";
-
-  const [showPin, setShowPin] = useState(false);
-  const [pin, setPin] = useState("");
-
-  const slideAnim = useRef(new Animated.Value(100)).current;
-  const fadeAnim = useRef(new Animated.Value(0)).current;
-
-  // --- Biometric Authentication ---
-  useEffect(() => {
-    (async () => {
-      const hasHardware = await LocalAuthentication.hasHardwareAsync();
-      const supported = await LocalAuthentication.isEnrolledAsync();
-
-      if (hasHardware && supported) {
-        const result = await LocalAuthentication.authenticateAsync({
-          promptMessage: "Authenticate to pay",
-          fallbackLabel: "Use PIN",
-        });
-        if (result.success) {
-          navigation.replace("Success", { mobile, amount, note });
+    // Biometric Auth
+    useEffect(() => {
+      (async () => {
+        const hasHardware = await LocalAuthentication.hasHardwareAsync();
+        const supported = await LocalAuthentication.isEnrolledAsync();
+        if (hasHardware && supported) {
+          const result = await LocalAuthentication.authenticateAsync({
+            promptMessage: "Authenticate to pay",
+            fallbackLabel: "Use PIN",
+            disableDeviceFallback: true,
+          });
+          if (result.success) {
+            navigation.replace("Success", { name, mobile, amount, note });
+          } else setShowPin(true);
         } else setShowPin(true);
-      } else setShowPin(true);
-    })();
-  }, []);
+      })();
+    }, []);
 
-  // --- Animate PIN / fingerprint view ---
-  useEffect(() => {
-    if (showPin) {
-      Animated.parallel([
-        Animated.spring(slideAnim, {
-          toValue: 0,
-          friction: 6,
-          tension: 40,
-          useNativeDriver: true,
-        }),
-        Animated.timing(fadeAnim, {
-          toValue: 1,
-          duration: 400,
-          useNativeDriver: true,
-        }),
+    // Animations
+    useEffect(() => {
+      Animated.stagger(100, [
+        Animated.spring(cardAnim, { toValue: 0, friction: 5, tension: 40, useNativeDriver: true }),
+        Animated.parallel([
+          Animated.spring(slideAnim, { toValue: 0, friction: 6, tension: 40, useNativeDriver: true }),
+          Animated.timing(fadeAnim, { toValue: 1, duration: 400, useNativeDriver: true }),
+        ]),
       ]).start();
-    }
-  }, [showPin]);
 
-  const handlePinSubmit = () => {
-    if (pin.length !== 4) return alert("Enter 4-digit PIN");
-    navigation.replace("Success", { mobile, amount, note });
-  };
+      const pulseLoop = Animated.loop(
+        Animated.sequence([
+          Animated.timing(pulseAnim, { toValue: 1.1, duration: 700, useNativeDriver: true }),
+          Animated.timing(pulseAnim, { toValue: 1, duration: 700, useNativeDriver: true }),
+        ])
+      );
+      if (!showPin) pulseLoop.start();
+      return () => pulseLoop.stop();
+    }, [showPin]);
 
-  return (
-    <View style={styles.container}>
-      {/* Back button */}
-      <TouchableOpacity
-        style={styles.backButton}
-        onPress={() => navigation.goBack()}
-      >
-        <MaterialCommunityIcons name="arrow-left" size={28} color="#065F46" />
-      </TouchableOpacity>
+    const handlePinSubmit = useCallback(() => {
+      if (pin.length !== 4) return alert("Enter 4-digit PIN");
+      navigation.replace("Success", { name, mobile, amount, note });
+    }, [pin]);
 
-      {/* Amount */}
-      <Text style={styles.amountText}>₹{amount}</Text>
-
-      {/* Recipient */}
-      <Text style={styles.mobileText}>
-        Paying to: {mobile.includes("@") ? maskUPI(mobile) : maskMobile(mobile)}
-      </Text>
-
-      {/* Note */}
-      {note ? <Text style={styles.noteText}>Note: {note}</Text> : null}
-
-      {showPin ? (
-        <Animated.View
-          style={{ opacity: fadeAnim, transform: [{ translateY: slideAnim }] }}
+    const renderPinInputs = () => {
+      const pinArray = pin.split("");
+      return [...Array(4)].map((_, i) => (
+        <View
+          key={i}
+          style={[
+            styles.pinCircle,
+            focusedIndex === i && { borderColor: "#10B981", shadowOpacity: 0.4, shadowRadius: 8 },
+          ]}
         >
-          <Text style={styles.label}>Enter your UPI PIN</Text>
-          <TextInput
-            placeholder="●●●●"
-            maxLength={4}
-            secureTextEntry={true}
-            keyboardType="number-pad"
-            style={styles.pinInput}
-            value={pin}
-            onChangeText={setPin}
-            placeholderTextColor="#A3A3A3"
-          />
-          <TouchableOpacity
-            style={styles.confirmButton}
-            onPress={handlePinSubmit}
-          >
-            <Text style={styles.confirmText}>Confirm Payment</Text>
-          </TouchableOpacity>
-        </Animated.View>
-      ) : (
-        <Animated.View
-          style={{ opacity: fadeAnim, transform: [{ translateY: slideAnim }] }}
-        >
-          <MaterialCommunityIcons
-            name="fingerprint"
-            size={100}
-            color="#059669"
-          />
-          <Text style={styles.fingerprintText}>Touch fingerprint sensor</Text>
-          <TouchableOpacity
-            style={styles.usePinButton}
-            onPress={() => setShowPin(true)}
-          >
-            <Text style={styles.usePinText}>Use PIN instead</Text>
-          </TouchableOpacity>
-        </Animated.View>
-      )}
-    </View>
-  );
-}
+          <Text style={styles.pinText}>{pinArray[i] ? "●" : ""}</Text>
+        </View>
+      ));
+    };
 
-// --- Styles ---
-const styles = {
-  container: {
-    flex: 1,
-    backgroundColor: "#ECFDF5",
-    justifyContent: "center",
-    alignItems: "center",
-    padding: 20,
-  },
-  backButton: {
-    position: "absolute",
-    top: 50,
-    left: 20,
-    zIndex: 10,
-  },
-  amountText: {
-    fontSize: 42,
-    fontWeight: "700",
-    color: "#065F46",
-    marginBottom: 8,
-  },
-  mobileText: {
-    fontSize: 18,
-    fontWeight: "600",
-    color: "#065F46",
-    marginBottom: 6,
-  },
-  noteText: {
-    fontSize: 16,
-    fontStyle: "italic",
-    color: "#6B7280",
-    marginBottom: 20,
-  },
-  label: {
-    fontSize: 20,
-    fontWeight: "600",
-    color: "#065F46",
-    textAlign: "center",
-    marginBottom: 20,
-  },
-  pinInput: {
-    backgroundColor: "#FFFFFF",
-    padding: 16,
-    borderRadius: 16,
-    fontSize: 24,
-    fontWeight: "700",
-    textAlign: "center",
-    color: "#065F46",
-    marginBottom: 24,
-    width: 200,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  confirmButton: {
-    backgroundColor: "#059669",
-    paddingVertical: 16,
-    borderRadius: 16,
-    alignItems: "center",
-    width: 200,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  confirmText: {
-    color: "#FFFFFF",
-    fontWeight: "700",
-    fontSize: 18,
-  },
-  fingerprintText: {
-    marginTop: 20,
-    fontSize: 18,
-    fontWeight: "600",
-    color: "#065F46",
-    textAlign: "center",
-  },
-  usePinButton: {
-    marginTop: 20,
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-  },
-  usePinText: {
-    color: "#059669",
-    fontWeight: "600",
-    fontSize: 16,
-  },
-};
+    return (
+      <SafeAreaView style={styles.container}>
+        {/* Back */}
+        <Pressable style={styles.backButton} onPress={() => navigation.goBack()}>
+          <MaterialCommunityIcons name="arrow-left" size={28} color="#064E3B" />
+        </Pressable>
+
+        {/* Floating Amount */}
+        <Animated.View style={[styles.amountContainer, { transform: [{ translateY: cardAnim }] }]}>
+          <Text style={styles.amountText}>₹{amount}</Text>
+        </Animated.View>
+
+        {/* Summary Card */}
+        <Animated.View style={[styles.card, { opacity: fadeAnim }]}>
+          <LinearGradient
+            colors={["rgba(255,255,255,0.7)", "rgba(255,255,255,0.3)"]}
+            style={styles.gradientCard}
+          >
+            <Text style={styles.payToLabel}>Paying to</Text>
+            <Text style={styles.recipientName}>{name}</Text>
+            {name !== mobile && <Text style={styles.recipientId}>{mobile}</Text>}
+            {note && <Text style={styles.noteText}>{note}</Text>}
+          </LinearGradient>
+        </Animated.View>
+
+        {/* Auth Section */}
+        <Animated.View style={[styles.authContainer, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
+          {showPin ? (
+            <>
+              <Text style={styles.pinLabel}>Enter your UPI PIN</Text>
+              <View style={styles.pinRow}>{renderPinInputs()}</View>
+              <TextInput
+                style={styles.hiddenInput}
+                keyboardType="number-pad"
+                maxLength={4}
+                autoFocus
+                value={pin}
+                onChangeText={setPin}
+                onFocus={() => setFocusedIndex(pin.length)}
+                onBlur={() => setFocusedIndex(null)}
+              />
+              <LinearGradient colors={["#059669", "#10B981"]} style={styles.confirmButton}>
+                <Pressable onPress={handlePinSubmit} style={{ width: "100%", alignItems: "center" }}>
+                  <Text style={styles.confirmText}>Confirm Payment</Text>
+                </Pressable>
+              </LinearGradient>
+            </>
+          ) : (
+            <>
+              <Animated.View style={{ transform: [{ scale: pulseAnim }] }}>
+                <MaterialCommunityIcons name="fingerprint" size={100} color="#10B981" />
+              </Animated.View>
+              <Text style={styles.fingerprintText}>Use Biometrics</Text>
+              <Pressable style={styles.usePinButton} onPress={() => setShowPin(true)}>
+                <Text style={styles.usePinText}>Use PIN Instead</Text>
+              </Pressable>
+            </>
+          )}
+        </Animated.View>
+      </SafeAreaView>
+    );
+  }
+
+
+
+
+  export const styles = StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: "#bdfaeeff",
+      justifyContent:"center",
+      alignItems: "center",
+      paddingTop: Platform.OS === "android" ? StatusBar.currentHeight + 10 : 10,
+      paddingHorizontal: 20,
+    },
+    backButton: {
+      position: "absolute",
+      top: (Platform.OS === "android" ? StatusBar.currentHeight : 0) + 15,
+      left: 20,
+      zIndex: 10,
+    },
+    amountContainer: {
+      marginTop: 40, 
+      marginBottom: 20,
+    },
+    amountText: {
+      fontSize: 75,
+      fontWeight: "bold",
+      color: "#065F46",
+      textAlign: "center",
+    },
+    card: {
+      width: width * 0.85,
+      borderRadius: 20,
+      backgroundColor: "#FFFFFF", 
+      shadowColor: "#000",
+      shadowOffset: { width: 0, height: 6 },
+      shadowOpacity: 0.08, // softer shadow
+      shadowRadius: 10,
+      elevation: 4,
+      paddingVertical: 28, // more vertical padding
+      paddingHorizontal: 24,
+      alignItems: "center",
+      marginBottom: 30, // space below card
+    },
+    payToLabel: {
+      fontSize: 15,
+      color: "#016445ff",
+      marginBottom: 6,
+    },
+    recipientName: {
+      fontSize: 28  ,
+      fontWeight: "bold",
+      color: "#065F46",
+      marginBottom: 2,
+    },
+    recipientId: {
+      fontSize: 25,
+      color: "#047857",
+      marginBottom: 6,
+    },
+    noteText: {
+      fontSize: 14,
+      fontStyle: "italic",
+      color: "#6B7280",
+      marginTop: 12,
+      textAlign: "center",
+    },
+    authContainer: {
+      width: width * 0.85,
+      alignItems: "center",
+      marginTop: 30, // breathing space above auth section
+    },
+    pinLabel: {
+      fontSize: 18,
+      fontWeight: "600",
+      color: "#065F46",
+      marginBottom: 20, // more spacing
+    },
+    pinRow: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      width: "80%",
+      marginBottom: 20,
+    },
+    pinCircle: {
+      width: 55, // slightly bigger
+      height: 55,
+      borderRadius: 28,
+      backgroundColor: "#FFFFFF",
+      alignItems: "center",
+      justifyContent: "center",
+      shadowColor: "#000",
+      shadowOffset: { width: 0, height: 3 },
+      shadowOpacity: 0.05,
+      shadowRadius: 4,
+      elevation: 3,
+      borderWidth: 2,
+      borderColor: "transparent",
+    },
+    pinText: {
+      fontSize: 24,
+      fontWeight: "bold",
+      color: "#065F46",
+    },
+    hiddenInput: {
+      position: "absolute",
+      width: 1,
+      height: 1,
+      opacity: 0,
+    },
+    confirmButton: {
+      borderRadius: 20,
+      width: "100%",
+      marginTop: 25, // more spacing above button
+      overflow: "hidden",
+      paddingVertical: 20, // taller for better touch target
+      alignItems: "center",
+    },
+    confirmText: {
+      color: "#FFF",
+      fontSize: 20,
+      fontWeight: "bold",
+    },
+    fingerprintText: {
+      fontSize: 18,
+      fontWeight: "600",
+      color: "#065F46",
+      marginTop: 20, // breathing space above text
+    },
+    usePinButton: {
+      marginTop: 25, // more spacing
+      paddingVertical: 10,
+      paddingHorizontal: 20,
+    },
+    usePinText: {
+      fontSize: 16,
+      fontWeight: "600",
+      color: "#10B981",
+    },
+  });

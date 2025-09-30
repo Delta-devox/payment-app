@@ -1,34 +1,59 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useCallback } from "react";
 import {
   View,
   Text,
   TextInput,
-  TouchableOpacity,
+  Pressable,
   KeyboardAvoidingView,
   Animated,
   StyleSheet,
+  useWindowDimensions,
+  Platform,
+  Modal,
 } from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
 
 export default function AmountScreen({ route, navigation }) {
   const { scannedData, mobile: mobileParam } = route.params || {};
   const [amount, setAmount] = useState("");
   const [note, setNote] = useState("");
+  const [focusedInput, setFocusedInput] = useState(null);
+  const [showConfirm, setShowConfirm] = useState(false);
+
   const sliderAnim = useRef(new Animated.Value(300)).current;
+  const borderAnim = useRef(new Animated.Value(0)).current; // for gradient animation
+  const { width } = useWindowDimensions();
 
-  
-  const mobileOrUpi = scannedData?.upiId || mobileParam || "Unknown";
+  const recipientName = scannedData?.name || mobileParam || "Unknown";
+  const recipientId = scannedData?.upiId || mobileParam || "Unknown";
 
-  const handleTransaction = () => {
-    if (!amount) {
-      return alert("Please Enter amount");
-    }
-   
+  const getAvatarColor = (name) => {
+    const colors = ["#059669", "#047857", "#0F766E", "#065F46"];
+    let sum = 0;
+    for (let i = 0; i < name.length; i++) sum += name.charCodeAt(i);
+    return colors[sum % colors.length];
+  };
+
+  const handleProceed = useCallback(() => {
+    if (!amount) return alert("Please enter an amount to proceed.");
+    setShowConfirm(true);
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(borderAnim, { toValue: 1, duration: 1000, useNativeDriver: false }),
+        Animated.timing(borderAnim, { toValue: 0, duration: 1000, useNativeDriver: false }),
+      ])
+    ).start();
+  }, [amount]);
+
+  const handleConfirmPayment = useCallback(() => {
+    setShowConfirm(false);
     navigation.navigate("Auth", {
-      mobile: mobileOrUpi,
+      name: recipientName,
+      mobile: recipientId,
       amount,
       note,
     });
-  };
+  }, [amount, note, recipientName, recipientId]);
 
   useEffect(() => {
     Animated.spring(sliderAnim, {
@@ -39,138 +64,140 @@ export default function AmountScreen({ route, navigation }) {
     }).start();
   }, []);
 
+  const shadowStyle = {
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 3,
+  };
+
+  const inputStyle = (inputName) => [
+    styles.inputBase,
+    shadowStyle,
+    focusedInput === inputName && { borderColor: "#059669", borderWidth: 2 },
+  ];
+
+  // Interpolating gradient positions
+  const gradientColors = borderAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ["#10B981", "#047857"], // light green to dark green
+  });
+
   return (
-    <KeyboardAvoidingView style={styles.container} behavior="padding">
-      <Animated.View style={{ transform: [{ translateY: sliderAnim }] }}>
+    <KeyboardAvoidingView
+      style={styles.container}
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
+    >
+      <Animated.View
+        style={[{ transform: [{ translateY: sliderAnim }] }, { width: "100%" }]}
+      >
         {/* Recipient Card */}
-        <View style={styles.recipientCard}>
-          <View style={styles.avatar}>
-            <Text style={styles.avatarText}>
-              {(scannedData?.name || mobileParam || "U")[0].toUpperCase()}
-            </Text>
+        <View style={[styles.recipientCard, shadowStyle]}>
+          <View
+            style={[styles.avatar, { backgroundColor: getAvatarColor(recipientName) }]}
+          >
+            <Text style={styles.avatarText}>{(recipientName || "U")[0].toUpperCase()}</Text>
           </View>
           <View>
             <Text style={styles.label}>Paying to</Text>
-            <Text style={styles.recipientText}>
-              {scannedData?.name || mobileParam || "Unknown"}
-            </Text>
+            <Text style={styles.recipientText}>{recipientName}</Text>
           </View>
         </View>
 
-        {/* Amount input */}
+        {/* Amount Input */}
         <TextInput
-          style={styles.amountInput}
+          style={inputStyle("amount")}
           placeholder="₹0"
           keyboardType="numeric"
           value={amount}
           onChangeText={setAmount}
           placeholderTextColor="#A3A3A3"
+          onFocus={() => setFocusedInput("amount")}
+          onBlur={() => setFocusedInput(null)}
         />
 
-        {/* Note input */}
+        {/* Note Input */}
         <TextInput
-          style={styles.noteInput}
+          style={inputStyle("note")}
           placeholder="Add a note (optional)"
           value={note}
           onChangeText={setNote}
           placeholderTextColor="#A3A3A3"
+          onFocus={() => setFocusedInput("note")}
+          onBlur={() => setFocusedInput(null)}
         />
 
-        {/* Button */}
-        <TouchableOpacity style={styles.nextButton} onPress={handleTransaction}>
+        {/* Proceed Button */}
+        <Pressable
+          style={({ pressed }) => [styles.nextButton, pressed && { opacity: 0.7 }]}
+          onPress={handleProceed}
+        >
           <Text style={styles.nextButtonText}>Proceed to Pay</Text>
-        </TouchableOpacity>
+        </Pressable>
       </Animated.View>
+
+      {/* Confirmation Modal */}
+      <Modal
+        transparent
+        visible={showConfirm}
+        animationType="fade"
+        onRequestClose={() => setShowConfirm(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <Animated.View style={{ borderRadius: 16, padding: 3 }}>
+            <LinearGradient
+              colors={["#10B981", "#047857"]}
+              start={[0, 0]}
+              end={[1, 1]}
+              style={{ borderRadius: 16 }}
+            >
+              <View style={styles.modalContainer}>
+                <Text style={styles.modalTitle}>Confirm Payment</Text>
+                <Text style={styles.modalText}>
+                  Are you sure you want to pay{" "}
+                  <Text style={styles.modalAmount}>₹{amount}</Text> to {recipientName}?
+                </Text>
+
+                <View style={styles.modalButtons}>
+                  <Pressable
+                    style={[styles.modalButton, { backgroundColor: "#E5E7EB" }]}
+                    onPress={() => setShowConfirm(false)}
+                  >
+                    <Text style={[styles.modalButtonText, { color: "#374151" }]}>Cancel</Text>
+                  </Pressable>
+                  <Pressable
+                    style={[styles.modalButton, { backgroundColor: "#059669" }]}
+                    onPress={handleConfirmPayment}
+                  >
+                    <Text style={styles.modalButtonText}>Confirm</Text>
+                  </Pressable>
+                </View>
+              </View>
+            </LinearGradient>
+          </Animated.View>
+        </View>
+      </Modal>
     </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#F9FAFB",
-    justifyContent: "center",
-    padding: 20,
-  },
-  recipientCard: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#FFFFFF",
-    padding: 20,
-    borderRadius: 16,
-    marginBottom: 24,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.05,
-    shadowRadius: 6,
-    elevation: 4,
-  },
-  avatar: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: "#059669",
-    justifyContent: "center",
-    alignItems: "center",
-    marginRight: 15,
-  },
-  avatarText: {
-    color: "#fff",
-    fontWeight: "700",
-    fontSize: 20,
-  },
-  label: {
-    fontSize: 14,
-    fontWeight: "500",
-    color: "#6B7280",
-  },
-  recipientText: {
-    fontSize: 18,
-    fontWeight: "800",
-    color: "#047857",
-  },
-  amountInput: {
-    backgroundColor: "#FFFFFF",
-    padding: 18,
-    borderRadius: 16,
-    fontSize: 32,
-    fontWeight: "700",
-    color: "#065F46",
-    marginBottom: 16,
-    textAlign: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  noteInput: {
-    backgroundColor: "#FFFFFF",
-    padding: 14,
-    borderRadius: 14,
-    fontSize: 16,
-    color: "#065F46",
-    marginBottom: 24,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.03,
-    elevation: 2,
-    shadowRadius: 3,
-  },
-  nextButton: {
-    backgroundColor: "#059669",
-    paddingVertical: 16,
-    borderRadius: 16,
-    alignItems: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  nextButtonText: {
-    color: "#FFFFFF",
-    fontWeight: "700",
-    fontSize: 18,
-  },
+  container: { flex: 1, backgroundColor: "#F9FAFB", justifyContent: "center", alignItems: "center", padding: 20 },
+  recipientCard: { flexDirection: "row", alignItems: "center", backgroundColor: "#FFFFFF", padding: 20, borderRadius: 16, marginBottom: 24 },
+  avatar: { width: 50, height: 50, borderRadius: 25, justifyContent: "center", alignItems: "center", marginRight: 15 },
+  avatarText: { color: "#fff", fontWeight: "700", fontSize: 20 },
+  label: { fontSize: 14, fontWeight: "500", color: "#6B7280" },
+  recipientText: { fontSize: 18, fontWeight: "800", color: "#047857" },
+  inputBase: { backgroundColor: "#FFFFFF", padding: 16, borderRadius: 16, fontSize: 20, fontWeight: "700", color: "#065F46", marginBottom: 16, textAlign: "center" },
+  nextButton: { backgroundColor: "#059669", paddingVertical: 16, borderRadius: 16, alignItems: "center", marginTop: 8 },
+  nextButtonText: { color: "#FFFFFF", fontWeight: "700", fontSize: 18 },
+  modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.4)", justifyContent: "center", alignItems: "center", padding: 20 },
+  modalContainer: { width: "100%", padding: 24, backgroundColor: "#fff", borderRadius: 16, justifyContent: "center", alignItems: "center" },
+  modalTitle: { fontSize: 28, fontWeight: "700", color: "#065F46", marginBottom: 16 },
+  modalText: { fontSize: 18, color: "#374151", textAlign: "center", marginBottom: 32, lineHeight: 26 },
+  modalAmount: { fontWeight: "700", color: "#059669" },
+  modalButtons: { flexDirection: "row", justifyContent: "space-between", width: "100%" },
+  modalButton: { flex: 1, paddingVertical: 16, marginHorizontal: 6, borderRadius: 12, alignItems: "center" },
+  modalButtonText: { fontSize: 16, fontWeight: "700", color: "#fff" },
 });

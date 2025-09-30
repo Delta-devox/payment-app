@@ -13,8 +13,9 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 export default function SuccessScreen({ navigation }) {
   const { width } = useWindowDimensions();
 
-  const SLIDER_CONTAINER_WIDTH = width * 0.8;
-  const SLIDE_RANGE = SLIDER_CONTAINER_WIDTH - 60;
+  const THUMB_SIZE = 80; // 🔥 bigger thumb
+  const SLIDER_CONTAINER_WIDTH = width * 0.85;
+  const SLIDE_RANGE = SLIDER_CONTAINER_WIDTH - THUMB_SIZE;
 
   const scaleAnim = useRef(new Animated.Value(0)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -53,6 +54,7 @@ export default function SuccessScreen({ navigation }) {
             duration: 200,
             useNativeDriver: false,
           }).start(() => navigation.replace("Home"));
+
           Animated.timing(fillAnim, {
             toValue: SLIDE_RANGE,
             duration: 200,
@@ -83,7 +85,7 @@ export default function SuccessScreen({ navigation }) {
         Thank you for using PaymentApp!
       </Animated.Text>
 
-      <View style={[styles.sliderContainer, { width: SLIDER_CONTAINER_WIDTH }]}>
+      <View style={[styles.sliderContainer, { width: SLIDER_CONTAINER_WIDTH, height: THUMB_SIZE }]}>
         <Animated.View
           style={[
             styles.sliderBackground,
@@ -92,9 +94,17 @@ export default function SuccessScreen({ navigation }) {
         />
         <Animated.View
           {...panResponder.panHandlers}
-          style={[styles.sliderThumb, { transform: [{ translateX: slideX }] }]}
+          style={[
+            styles.sliderThumb,
+            {
+              width: THUMB_SIZE,
+              height: THUMB_SIZE,
+              borderRadius: THUMB_SIZE / 2,
+              transform: [{ translateX: slideX }],
+            },
+          ]}
         >
-          <MaterialCommunityIcons name="arrow-right" size={28} color="#16A34A" />
+          <MaterialCommunityIcons name="arrow-right" size={36} color="#16A34A" />
         </Animated.View>
         <Text style={styles.sliderText}>Slide to go Home</Text>
       </View>
@@ -124,8 +134,7 @@ const styles = StyleSheet.create({
     marginBottom: 40,
   },
   sliderContainer: {
-    height: 60,
-    borderRadius: 30,
+    borderRadius: 40,
     backgroundColor: "#fff",
     overflow: "hidden",
     justifyContent: "center",
@@ -133,13 +142,10 @@ const styles = StyleSheet.create({
   },
   sliderBackground: {
     ...StyleSheet.absoluteFillObject,
-    borderRadius: 30,
+    borderRadius: 40,
     left: 0,
   },
   sliderThumb: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
     backgroundColor: "#fff",
     justifyContent: "center",
     alignItems: "center",
