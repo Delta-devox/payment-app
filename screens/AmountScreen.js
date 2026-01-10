@@ -21,7 +21,7 @@ export default function AmountScreen({ route, navigation }) {
   const [showConfirm, setShowConfirm] = useState(false);
 
   const sliderAnim = useRef(new Animated.Value(300)).current;
-  const borderAnim = useRef(new Animated.Value(0)).current; // for gradient animation
+  const borderAnim = useRef(new Animated.Value(0)).current; 
   const { width } = useWindowDimensions();
 
   const recipientName = scannedData?.name || mobileParam || "Unknown";
@@ -47,6 +47,12 @@ export default function AmountScreen({ route, navigation }) {
 
   const handleConfirmPayment = useCallback(() => {
     setShowConfirm(false);
+    const enteredAmount = parseFloat(amount);
+    if(isNaN(enteredAmount) || enteredAmount <= 0) {
+      return alert("Please enter a valid amount.");
+    }
+
+    
     navigation.navigate("Auth", {
       name: recipientName,
       mobile: recipientId,
@@ -78,12 +84,6 @@ export default function AmountScreen({ route, navigation }) {
     focusedInput === inputName && { borderColor: "#059669", borderWidth: 2 },
   ];
 
-  // Interpolating gradient positions
-  const gradientColors = borderAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: ["#10B981", "#047857"], // light green to dark green
-  });
-
   return (
     <KeyboardAvoidingView
       style={styles.container}
@@ -92,11 +92,9 @@ export default function AmountScreen({ route, navigation }) {
       <Animated.View
         style={[{ transform: [{ translateY: sliderAnim }] }, { width: "100%" }]}
       >
-        {/* Recipient Card */}
+     
         <View style={[styles.recipientCard, shadowStyle]}>
-          <View
-            style={[styles.avatar, { backgroundColor: getAvatarColor(recipientName) }]}
-          >
+          <View style={[styles.avatar, { backgroundColor: getAvatarColor(recipientName) }]}>
             <Text style={styles.avatarText}>{(recipientName || "U")[0].toUpperCase()}</Text>
           </View>
           <View>
@@ -117,7 +115,7 @@ export default function AmountScreen({ route, navigation }) {
           onBlur={() => setFocusedInput(null)}
         />
 
-        {/* Note Input */}
+        
         <TextInput
           style={inputStyle("note")}
           placeholder="Add a note (optional)"
@@ -128,7 +126,7 @@ export default function AmountScreen({ route, navigation }) {
           onBlur={() => setFocusedInput(null)}
         />
 
-        {/* Proceed Button */}
+       
         <Pressable
           style={({ pressed }) => [styles.nextButton, pressed && { opacity: 0.7 }]}
           onPress={handleProceed}

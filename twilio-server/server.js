@@ -1,37 +1,46 @@
-require('dotenv').config();
-const express = require('express');
-const bodyParser = require('body-parser');
-const cors = require('cors');
-const twilio = require('twilio');
+const express = require("express");
+const cors = require("cors");
+const dotenv = require("dotenv");
+const twilio = require("twilio");
 
+dotenv.config();
 const app = express();
 app.use(cors());
-app.use(bodyParser.json());
+app.use(express.json());
 
-const client = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
-const fromNumber = process.env.TWILIO_PHONE_NUMBER;
+const { TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_NO } = process.env;
 
-app.post('/send-sms',async(req,res)=>
+const client = twilio(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN);
+
+app.get("/test",(req,res)=>
 {
-    const {to,message} = req.body;
+  res.json({message:"Server is reachable"});
+})
 
-     if (!to || !message) {
-    return res.status(400).json({ success: false, error: "Missing 'to' or 'message' in request body" });
+
+app.post("/send-sms", async (req, res) => {
+  try {
+    const { to, amount, name } = req.body;
+
+    if (!to || !amount || !name) {
+      return res.status(400).json({ error: "Missing required fields" });
     }
 
-    try{
-        const msg = await client.messages.create({
-            body:message,
-            from:fromNumber,
-            to:to,
-        });
-        res.json({success:true, sid:msg.sid});
-    }
-    catch(error)
-    {
-        console.error("Error sending sms",error)
-        res.status(500).json({success:false,error:error.message});
-    }
+    const body = `Hi ${name}, ₹${amount} has been credited to your account successfully. - PaymentApp`;
+
+    const message = await client.messages.create({
+      body,
+      from: TWILIO_NO,
+      to,
+    });
+
+    res.json({ success: true, sid: message.sid });
+  } catch (error) {
+    console.error("Error sending sms:", error);
+    res.status(500).json({ error: "Failed to send sms" });
+  }
 });
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+
+app.listen(5000, () => {
+  console.log("Server running on port 5000");
+});

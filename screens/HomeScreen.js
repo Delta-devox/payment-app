@@ -20,15 +20,24 @@ import TransactionCard from "../components/TransactionCard";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { TransactionContext } from "../context/TransactionContext";
 import EnhancedSidebar from "../components/Sidebar";
+import { MoneyContext } from "../context/MoneyContext";
 
 const { width } = Dimensions.get("window");
 
+
 export default function HomeScreen({ navigation }) {
+  const moneyctx = useContext(MoneyContext);
   const [mobile, setMobile] = useState("");
   const animValues = useRef([...Array(6)].map(() => new Animated.Value(0))).current;
   const { transaction } = useContext(TransactionContext);
   const recentTx = transaction.slice(0, 4);
   const [sidebarOpen, setOpen] = useState(false);
+
+  useEffect(() => {
+    console.log(moneyctx);
+  },[moneyctx]);
+
+  const balance = typeof moneyctx?.balance === "number" ? moneyctx.balance : Number(moneyctx?.balance) || 0;
 
   const actions = [
     { name: "Scan QR", icon: "qrcode-scan" },
@@ -92,7 +101,7 @@ export default function HomeScreen({ navigation }) {
           style={styles.greetingCard}
         >
           <Text style={styles.greetingText}>Good Morning, AB 👋</Text>
-          <Text style={styles.greetingBalance}>Balance: ₹5,430</Text>
+          <Text style={styles.greetingBalance}>Balance:₹{balance.toFixed(2)}</Text>
         </LinearGradient>
 
         {/* Pay Section */}
